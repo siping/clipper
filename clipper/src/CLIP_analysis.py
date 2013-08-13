@@ -16,7 +16,7 @@ from random import sample
 import subprocess
 
 from bx.bbi.bigwig_file import BigWigFile
-import gffutils
+#import gffutils
 import numpy as np
 import pandas as pd
 import pybedtools
@@ -1408,8 +1408,8 @@ def main(options):
     regions["proxintron500"] = "Proximal\nIntron"
     regions["distintron500"] = "Distal\nIntron"
     
-    db = gffutils.FeatureDB(options.db)
-    
+#    db = gffutils.FeatureDB(options.db)
+    db = None #hack to get working on tscc without access to sqlite3
     print "getting regions"
     genomic_regions = get_genomic_regions(species, db)
     print "Done"
@@ -1461,7 +1461,9 @@ def main(options):
     
     #might want to actually count genes_dict, not clusters...
     total_reads = count_total_reads(bamtool, genes_bed)
-    region_read_counts = {region_name : count_total_reads(bamtool, cur_region) for region_name, cur_region in genomic_regions.items() }
+    region_read_counts = {}
+    for region_name, cur_region in genomic_regions.items():
+        region_read_counts[region_name] = count_total_reads(bamtool, cur_region)  
     
     #one stat is just generated here
     #generates cluster lengths (figure 3)
@@ -1545,10 +1547,23 @@ def main(options):
     out_dict["motifs"] = motifs
     out_dict["phast_values"] = phast_values
     out_dict["motif_distances"] = motif_distances
-    out_dict['features_transcript_closest'] = features_transcript_closest
-    out_dict['features_mrna_closest'] = features_mrna_closest
+    test_file = open("foo.pickle",'w')
+    for name, feature in features_transcript_closest.items():
+        if feature['dist'] is not None:
+            feature['dist'].saveas(clusters + "_" + name + "_transcript.bed")
+
+    for name, feature in features_mrna_closest.items():
+        if feature['dist'] is not None:
+            feature['dist'].saveas(clusters + "_" + name + "_mrna.bed")
+    #    pickle.dump(features_transcript_closest, file=test_file)
+    #    pickle.dump(features_mrna_closest, file=test_file)
+    pickle.dump(distributions, file=test_file)
+    pickle.dump(classes, file=test_file)
+    pickle.dump(region_read_counts, file=test_file)
+    #out_dict['features_transcript_closest'] = features_transcript_closest
+    #out_dict['features_mrna_closest'] = features_mrna_closest
     out_dict['distributions'] = distributions
-    out_dict['data'] = read_densities
+    out_dict['data'] = np.array(read_densities)
     out_dict['classes'] = classes
     out_dict['region_read_counts'] = region_read_counts
     out_file = open(os.path.join("%s.pickle" %(clusters)), 'w')
