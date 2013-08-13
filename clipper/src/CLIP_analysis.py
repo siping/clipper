@@ -408,7 +408,78 @@ def get_offsets_bed12(tool):
     return offset_dict
 
 
+def RNA_position_interval(interval, location_dict):
     
+    """
+    
+    makes mrna and pre-mrna peak_center figure 
+    interval - single interval
+    
+    location_dict = dict{gene_id : {strand : "+/-", regions : list((start,stop)
+    as_structure_dict - from build AS structure dict 
+    
+    will return distribution across entire region + just across specific region
+    Might be able to use my ribo-seq stuff for genic -> transcriptomic location conversion
+    
+    this is based off as structure, which provides sequences ordered with first exon being the first exon on the gene, not 
+    first in the chromosome (like gff does) THIS WILL NOT WORK WITH RAW GFF DATA
+    
+    """
+    
+    #think about turning the location_dict into a gff file
+    #gets thickstart and stop
+    peak_center = (int(interval[6]) + int(interval[7])) / 2
+        
+    try:
+        gene = interval.name.split("_")[0]
+    except:
+        #takes first gene if there are multiple overlapping 
+        gene = interval.name.split(";")[0].split("_")[0]
+    
+    if gene not in location_dict:
+        raise KeyError(gene + " not in current as stucture dict ignoring cluster ")
+    
+    if not interval.strand == location_dict[gene][0].strand:
+        raise ValueError("strands not the same, there is some issue with gene annotations")
+    
+    total_length = float(sum(region.length for region in location_dict[gene]))
+    
+    running_length = 0
+    
+    #reverses list if negative strand so running count can work
+    #if location_dict[gene]['strand'] == "-":
+    #    location_dict[gene]['regions'].reverse()
+        
+    for region in location_dict[gene]:
+        length = float(region.length) 
+
+        if peak_center >= int(region.start) and peak_center <= int(region.stop):
+            if interval.strand == "+":
+                total_location = running_length + (peak_center - region.start)
+                total_fraction = np.round((total_location / total_length), 3)
+
+                individual_fraction = (peak_center - region.start) / length
+
+            elif interval.strand == "-":
+                total_location = running_length + (region.stop - peak_center)
+                total_fraction = total_location / total_length
+                individual_fraction = (region.stop - peak_center) / length
+                
+            else:
+                raise ValueError("Strand not correct strand is %s" % interval.strand)
+
+            #probably not nessessary
+            if total_fraction < 0 or total_fraction > 1:
+                raise ValueError("total_fraction is bad: %f, gene %s, total_length: %s, total_location: %s" % (total_fraction, 
+                                                                                                               gene, 
+                                                                                                              total_length,
+                                                                                                               total_location))
+            return individual_fraction, total_fraction
+        
+        running_length += length
+        
+    return None, None #clusters fall outside of regions integrated
+
 def RNA_position(interval, location_dict):
     
     """
@@ -488,7 +559,7 @@ def to_bed(x):
     converts gtf formatted object to bed format
     
     """
-    return x.chrom, x.start, x.stop, x.attributes['gene_id'], "0", x.strand
+    return x.chrom, x.start, x.stop, x.attributes['gene_id'].split(".")[0], "0", x.strand
 
 def get_introns(exons):
     
@@ -543,14 +614,17 @@ def get_genomic_regions(species, db):
     five_prime_utrs = []
     cds = []
     exons = []
+    gene_list = []
     for gene in genes:
         mrnas = list(db.children(gene, featuretype='mRNA'))
-    
+        
          
         gene_three_prime_utrs = []
         gene_five_prime_utrs = []
         gene_cds = []
         gene_exons = []
+        
+        gene_list.append(gene)
         for mrna in mrnas:
     
             utrs =  list(db.children(mrna, featuretype='UTR'))
@@ -617,13 +691,43 @@ def get_genomic_regions(species, db):
     
     introns = get_introns(exons).saveas(os.path.join(species + "_introns.bed"))
         
-    return { "five_prime_utrs" : pybedtools.BedTool(map(to_bed, five_prime_utrs)).saveas(os.path.join(species + "_five_prime_utrs.bed")),
+    return { 'genes' : pybedtools.BedTool(map(to_bed, gene_list)).saveas(os.path.join(species + "genes.bed")),
+            "five_prime_utrs" : pybedtools.BedTool(map(to_bed, five_prime_utrs)).saveas(os.path.join(species + "_five_prime_utrs.bed")),
              "three_prime_utrs" : pybedtools.BedTool(map(to_bed, three_prime_utrs)).saveas(os.path.join(species + "_three_prime_utrs.bed")),
              "cds" : pybedtools.BedTool(map(to_bed, cds)).saveas(os.path.join(species + "_cds.bed")),
              "exons" : exons,
              "introns" : introns }
     
 
+def get_feature_locations(species, db):
+    
+    """
+    
+    Gets locations of genic features, five prime sites, 3 prime sites, poly a sites stop codons start codons and tss
+    based off annotated gtf db file
+    
+    db - db handle generated by gtf utils
+    
+    returns dict of bedfiles     { five_prime_ends : bedtool 
+                                   three_prime_ends
+                                   poly_a_sites
+                                   stop_codons
+                                   transcription_start_sites 
+                                } 
+    
+    """
+    #clipper.data_file(
+    try:
+       return { "five_prime_ends" : pybedtools.BedTool(species + "_five_prime_ends.bed"),
+             "three_prime_ends" : pybedtools.BedTool(species + "_three_prime_ends.bed"),
+             "poly_a_sites" : pybedtools.BedTool(species + "_poly_a_sites.bed"),
+             "stop_codons" : pybedtools.BedTool(species + "_stop_codons.bed"),
+             "start_codons" : pybedtools.BedTool(species + "_start_codons.bed"),
+             "transcription_start_sites" : pybedtools.BedTool(species + "_transcription_start_sites.bed")}
+
+    except:
+        pass
+    
 def get_feature_locations(species, db):
     
     """
@@ -660,8 +764,9 @@ def get_feature_locations(species, db):
     stop_codons = []
     start_codons = []
     transcription_start_sites = []
-    
+    count = 0
     for gene in genes:
+        count += 1
         try:
             coding_length = 0 
             for exon in db.children(gene, featuretype='exon'):
@@ -689,7 +794,7 @@ def get_feature_locations(species, db):
                 
         except IndexError:
             pass
-    
+
     return { "five_prime_ends" : pybedtools.BedTool(five_prime_ends).saveas(os.path.join(species + "_five_prime_ends.bed")),
              "three_prime_ends" :pybedtools.BedTool(three_prime_ends).saveas(os.path.join(species + "_three_prime_ends.bed")),
              "poly_a_sites" :  pybedtools.BedTool(poly_a_sites).saveas(os.path.join(species + "_poly_a_sites.bed")),
@@ -755,7 +860,7 @@ def get_distributions(bedtool, region_dict):
     for interval in bedtool:
         try: 
             #will need to redefine this to use intervals
-            exon, total = RNA_position(interval, region_dict)
+            exon, total = RNA_position_interval(interval, region_dict)
   
             if total is not None:
                 total_distributions.append(total)
@@ -763,6 +868,7 @@ def get_distributions(bedtool, region_dict):
             else:
                 num_missed.append(interval)
         except Exception as e:
+            print e
             num_errors.append(interval)
 
     return exon_distributions, total_distributions, num_errors, num_missed
@@ -818,6 +924,7 @@ def calculate_peak_locations(bedtool, genes, regions, features):
             features_mrna_closest[name] = {"dist" : beds_center_transcripts_mrna.closest(feature, s=True, D="ref", t="first").filter(lambda x: x[-2] != ".").each(invert_neg).saveas()}
         except:
             features_mrna_closest[name] = {"dist" : None}
+            
     #I should factor out this building logic...
     exons_dict = {}
     for gene in genes:
@@ -1407,7 +1514,9 @@ def main(options):
     regions["UTR5"] = "5' UTR"
     regions["proxintron500"] = "Proximal\nIntron"
     regions["distintron500"] = "Distal\nIntron"
-    
+    #mm9 = gffutils.FeatureDB("/nas3/yeolab/Genome/ensembl/gtf/Mus_musculus.NCBIM37.64.fixed.gtf.db")
+#hg19 = gffutils.FeatureDB("/nas3/yeolab/Genome/ensembl/gtf/gencode.v17.annotation.gtf.db")
+#import gtfutils
     db = gffutils.FeatureDB(options.db)
     
     print "getting regions"
