@@ -549,6 +549,19 @@ def generate_peak_distribution(ax, distribution, total = False):
     #sample_shuffled_count, bins = generate_distribution(concatenate(array([distribution_dict[distribuiton][0] for distribuiton in distribution_dict if "control" in distribuiton])))
     #plot(bins, sample_shuffled_count, label="control", linewidth=3, alpha=.7)
     ax.legend(loc=0)
+
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+def build_peak_densities(ax, read_densities, classes):
+    
+    reClasses = classes[classes.argsort()].reshape(len(classes),1)
+    reordered = read_densities[classes.argsort()]
+    finalRank = classes.argsort()
+    cluster = ax.matshow(reordered, aspect='auto', origin='lower') #, norm=norm)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cluster, cax=cax)
+
     
 def plot_distributions(features_transcript_closest, features_mrna_closest, distributions):
     
@@ -697,7 +710,8 @@ def plot_motif_dist(motif_distances, figure, color = "red", label=None, scale='l
 def CLIP_QC_figure(reads_in_clusters, reads_out_clusters, cluster_lengths, 
                    reads_per_cluster, premRNA, mRNA, exondist, introndist, 
                    genomic_locs, clusters_locs, genomic_types, clusters_types,
-                   homer_location, kmer_results, motifs, phastcons_values, regions):
+                   homer_location, kmer_results, motifs, phastcons_values, regions,
+                   read_densities, classes):
     
     """
     
@@ -722,7 +736,9 @@ def CLIP_QC_figure(reads_in_clusters, reads_out_clusters, cluster_lengths,
     motifs - list[str] motifs to plot
     phastcons_values -- list[float] - conservation scores for each cluster
     regions - dict of short name : printable name 
-    
+    read_densities - read denisites around peaks, np matrix
+    classes - np array, classes resulting from k-means clustering, goes with read denisites
+
     """
     
     #First do layout for main figures
@@ -754,6 +770,9 @@ def CLIP_QC_figure(reads_in_clusters, reads_out_clusters, cluster_lengths,
     
     #Creates exon distance axis
     ax_exondist = plt.subplot(gs_line2[2:4], title = "Distribution Across Exons and Introns")
+    
+    #Creates read densities axis
+    ax_read_densities = plt.subplot(gs_line2[4:], title = "Read Densities Around Peaks")
     
     #Creates out 3rd column minus the motif z-scores
     gs_pie_nearestType = gridspec.GridSpecFromSubplotSpec(1,4, subplot_spec=full_grid[2,0:2])
@@ -787,6 +806,7 @@ def CLIP_QC_figure(reads_in_clusters, reads_out_clusters, cluster_lengths,
         build_phastcons_values(ax_cons, phastcons_values, regions)
     build_gene_distribution(ax_genedist, premRNA, mRNA)
     build_exon_exon_distribution(ax_exondist, exondist, introndist)
+    build_peak_densities(ax_read_densities, read_densities, classes)
     build_genomic_content(ax_pie_genomic, genomic_locs, regions)
     
     #filter out intronic regions
