@@ -694,6 +694,7 @@ class myGMM(sklearnGMM):
 class GaussMix(PeakGenerator):
     
     def __init__(self, xvals, cover):
+
         #data should count one "base" per read (not one point for each position)
         #initialize the fitter
 
