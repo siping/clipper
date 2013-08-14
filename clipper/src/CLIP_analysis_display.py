@@ -540,9 +540,9 @@ def generate_peak_distribution(ax, distribution, total = False):
     """
 
     if total:
-        total_int = 1
+        total_int = 'total'
     else:
-        total_int = 0
+        total_int = 'individual'
     sample_count, bins = generate_distribution(distribution[total_int])
     ax.plot(bins, sample_count, label="rbp", linewidth=3, alpha=.7)
         
