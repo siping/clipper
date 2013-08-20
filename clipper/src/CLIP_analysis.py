@@ -1558,7 +1558,7 @@ def main(options):
     #figures 5 and 6, builds pre-mrna, mrna exon and intron distributions
     types, premRNA_positions, mRNA_positions, exon_positions, intron_positions, features_transcript_closest, features_mrna_closest, distributions = calculate_peak_locations(cluster_regions['all']['real'], genes_dict, genomic_regions, features)
     
-    read_densities, classes = cluser_peaks(cluster_regions['all']['real'], bw_pos, bw_neg)
+#    read_densities, classes = cluser_peaks(cluster_regions['all']['real'], bw_pos, bw_neg)
     
     #gtypes is total genomic content 
     #types is what clusters are
@@ -1588,29 +1588,13 @@ def main(options):
     if options.runPhast:
         phast_values = calculate_phastcons(assigned_regions, cluster_regions, options.phastcons_location)
     print "ending phast"
-    #build qc figure
-    QCfig_params = [reads_in_clusters, (total_reads - reads_in_clusters), 
-                    cluster_lengths, reads_per_cluster, distributions['genes']['total'], 
-                    distributions['exons']['total'], distributions['exons']['individual'], 
-                    distributions['introns']['individual'], genic_region_sizes, region_sizes, 
-                    genomic_type_count, type_count, homerout, kmer_results, motifs, phast_values, 
-                    regions, np.array(read_densities), classes]
-    
-    QCfig = CLIP_analysis_display.CLIP_QC_figure(*QCfig_params)
-    distribution_fig = CLIP_analysis_display.plot_distributions(features_transcript_closest, features_mrna_closest, distributions)
-    QCfig.savefig(os.path.join(outdir, clusters + ".QCfig." + options.extension))
-    distribution_fig.savefig(clusters + "DistFig." + options.extension)  
-      
-    #prints distance of clusters from various motifs in a different figure
-    motif_distances = []
+
     try:
         if motifs:
             motif_distances = generate_motif_distances(cluster_regions, region_sizes, motifs, options.motif_location, options.species)
-            motif_fig = CLIP_analysis_display.plot_motifs(motif_distances)
-            motif_fig.savefig(clusters + ".motif_distribution." + options.extension)
     except:
-        pass
-    
+        pass    
+
     #save all analysies in a pickle dict
     out_dict = {}
     out_dict["region_sizes"] = region_sizes
@@ -1637,19 +1621,35 @@ def main(options):
     for name, feature in features_mrna_closest.items():
         if feature['dist'] is not None:
             feature['dist'].saveas(clusters + "_" + name + "_mrna.bed")
-    #    pickle.dump(features_transcript_closest, file=test_file)
-    #    pickle.dump(features_mrna_closest, file=test_file)
-    pickle.dump(distributions, file=test_file)
-    pickle.dump(classes, file=test_file)
-    pickle.dump(region_read_counts, file=test_file)
-    #out_dict['features_transcript_closest'] = features_transcript_closest
-    #out_dict['features_mrna_closest'] = features_mrna_closest
     out_dict['distributions'] = distributions
-    out_dict['data'] = np.array(read_densities)
-    out_dict['classes'] = classes
+#    out_dict['data'] = np.array(read_densities)
+#    out_dict['classes'] = classes
     out_dict['region_read_counts'] = region_read_counts
     out_file = open(os.path.join("%s.pickle" %(clusters)), 'w')
     pickle.dump(out_dict, file=out_file)
+    
+    print "file saved"
+    #build qc figure
+    QCfig_params = [reads_in_clusters, (total_reads - reads_in_clusters), 
+                    cluster_lengths, reads_per_cluster, distributions['genes']['total'], 
+                    distributions['exons']['total'], distributions['exons']['individual'], 
+                    distributions['introns']['individual'], genic_region_sizes, region_sizes, 
+                    genomic_type_count, type_count, homerout, kmer_results, motifs, phast_values, 
+                    regions, np.array(read_densities), classes]
+    
+    QCfig = CLIP_analysis_display.CLIP_QC_figure(*QCfig_params)
+    distribution_fig = CLIP_analysis_display.plot_distributions(features_transcript_closest, features_mrna_closest, distributions)
+    QCfig.savefig(os.path.join(outdir, clusters + ".QCfig." + options.extension))
+    distribution_fig.savefig(clusters + "DistFig." + options.extension)  
+      
+    #prints distance of clusters from various motifs in a different figure
+    motif_distances = []
+    try:
+        if motifs:
+            motif_fig = CLIP_analysis_display.plot_motifs(motif_distances)
+            motif_fig.savefig(clusters + ".motif_distribution." + options.extension)
+    except:
+        pass
     
     with open(options.metrics, 'w') as outfile:
         outfile.write("FRiP\n")

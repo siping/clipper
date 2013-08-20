@@ -806,7 +806,7 @@ def CLIP_QC_figure(reads_in_clusters, reads_out_clusters, cluster_lengths,
         build_phastcons_values(ax_cons, phastcons_values, regions)
     build_gene_distribution(ax_genedist, premRNA, mRNA)
     build_exon_exon_distribution(ax_exondist, exondist, introndist)
-    build_peak_densities(ax_read_densities, read_densities, classes)
+#    build_peak_densities(ax_read_densities, read_densities, classes)
     build_genomic_content(ax_pie_genomic, genomic_locs, regions)
     
     #filter out intronic regions
