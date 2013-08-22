@@ -1558,11 +1558,12 @@ def main(options):
     #figures 5 and 6, builds pre-mrna, mrna exon and intron distributions
     types, premRNA_positions, mRNA_positions, exon_positions, intron_positions, features_transcript_closest, features_mrna_closest, distributions = calculate_peak_locations(cluster_regions['all']['real'], genes_dict, genomic_regions, features)
     
-#    read_densities, classes = cluser_peaks(cluster_regions['all']['real'], bw_pos, bw_neg)
+    read_densities, classes = cluser_peaks(cluster_regions['all']['real'], bw_pos, bw_neg)
     
     #gtypes is total genomic content 
     #types is what clusters are
     #generates figure 10 (exon distances)
+    
     type_count = [types["CE:"], types["SE:"], 
                   types["MXE:"], types["A5E:"], types["A3E:"]]
     
@@ -1588,12 +1589,14 @@ def main(options):
     if options.runPhast:
         phast_values = calculate_phastcons(assigned_regions, cluster_regions, options.phastcons_location)
     print "ending phast"
-
+    
+    motif_distances = []
     try:
         if motifs:
             motif_distances = generate_motif_distances(cluster_regions, region_sizes, motifs, options.motif_location, options.species)
+                    
     except:
-        pass    
+        pass
 
     #save all analysies in a pickle dict
     out_dict = {}
@@ -1613,7 +1616,6 @@ def main(options):
     out_dict["motifs"] = motifs
     out_dict["phast_values"] = phast_values
     out_dict["motif_distances"] = motif_distances
-    test_file = open("foo.pickle",'w')
     for name, feature in features_transcript_closest.items():
         if feature['dist'] is not None:
             feature['dist'].saveas(clusters + "_" + name + "_transcript.bed")
@@ -1622,8 +1624,8 @@ def main(options):
         if feature['dist'] is not None:
             feature['dist'].saveas(clusters + "_" + name + "_mrna.bed")
     out_dict['distributions'] = distributions
-#    out_dict['data'] = np.array(read_densities)
-#    out_dict['classes'] = classes
+    out_dict['data'] = np.array(read_densities)
+    out_dict['classes'] = classes
     out_dict['region_read_counts'] = region_read_counts
     out_file = open(os.path.join("%s.pickle" %(clusters)), 'w')
     pickle.dump(out_dict, file=out_file)
@@ -1643,7 +1645,7 @@ def main(options):
     distribution_fig.savefig(clusters + "DistFig." + options.extension)  
       
     #prints distance of clusters from various motifs in a different figure
-    motif_distances = []
+    
     try:
         if motifs:
             motif_fig = CLIP_analysis_display.plot_motifs(motif_distances)
